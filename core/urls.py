@@ -25,5 +25,5 @@ urlpatterns = [
     path('predict/<str:ticker_value>/<str:number_of_days>/', predict),
     path('ticker/', ticker),
     path('about/', about),
-    path('contact/', contact)
+    path('contact/', contact, name='contact')
 ]

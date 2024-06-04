@@ -1,5 +1,5 @@
 from urllib import request
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.http import HttpResponse
 from django.template import RequestContext
 
@@ -20,6 +20,10 @@ from .models import Project
 
 from sklearn.linear_model import LinearRegression
 from sklearn import preprocessing, model_selection, svm
+
+from django.contrib import messages
+
+from .forms import ContactForm
 
 
 
@@ -113,16 +117,15 @@ def about(request):
 
 def contact(request):
     if request.method == 'POST':
-        name = request.POST['name']
-        email = request.POST['email']
-        subject = request.POST['subject']
-        message = request.POST['message']
-        
-        # Here you would save the data to the database or send an email
-        
-        messages.success(request, 'Your message has been sent successfully!')
-        return redirect('contact')
-    return render(request, 'contact.html')
+        form = ContactForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Your message has been sent successfully!')
+            return redirect('contact')
+    else:
+        form = ContactForm()
+    
+    return render(request, 'contact.html', {'form': form})
 
 def ticker(request):
     # ================================================= Load Ticker Table ================================================

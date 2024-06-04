@@ -20,7 +20,7 @@ class Project(models.Model):
         super().save(*args, **kwargs)
 
 
-class ContactMessage(models.Model):
+class Contact(models.Model):
     name = models.CharField(max_length=100)
     email = models.EmailField()
     subject = models.CharField(max_length=200)
