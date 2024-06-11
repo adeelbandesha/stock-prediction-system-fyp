@@ -22,8 +22,10 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', index),
     path('search/', search),
+    path('search_bayesian/', search_bayesian),
     path('predict/<str:ticker_value>/<str:number_of_days>/', predict),
     path('ticker/', ticker),
     path('about/', about),
-    path('contact/', contact, name='contact')
+    path('contact/', contact, name='contact'),
+    path('predict_bayesian/<str:ticker_value>/<str:number_of_days>/', predict_with_dbn),
 ]
