@@ -414,6 +414,153 @@ def predict_bayesian(request, ticker_value, number_of_days):
 
 
 
+# def predict_with_dbn(request, ticker_value, number_of_days):
+#     try:
+#         ticker_value = ticker_value.upper()
+#         df = yf.download(tickers=ticker_value, period='1d', interval='1m')
+#         print("Downloaded ticker = {} successfully".format(ticker_value))
+#     except Exception as e:
+#         print(f"Error downloading data: {e}")
+#         return render(request, 'API_Down.html', {})
+
+#     try:
+#         number_of_days = int(number_of_days)
+#     except:
+#         return render(request, 'Invalid_Days_Format.html', {})
+
+#     if ticker_value not in Valid_Ticker:
+#         return render(request, 'Invalid_Ticker.html', {})
+
+#     if number_of_days < 0:
+#         return render(request, 'Negative_Days.html', {})
+
+#     if number_of_days > 365:
+#         return render(request, 'Overflow_days.html', {})
+
+#     fig = go.Figure()
+#     fig.add_trace(go.Candlestick(x=df.index,
+#                                  open=df['Open'],
+#                                  high=df['High'],
+#                                  low=df['Low'],
+#                                  close=df['Close'], name='market data'))
+#     fig.update_layout(
+#         title='{} live share price evolution'.format(ticker_value),
+#         yaxis_title='Stock Price (USD per Shares)')
+#     fig.update_xaxes(
+#         rangeslider_visible=True,
+#         rangeselector=dict(
+#             buttons=list([
+#                 dict(count=15, label="15m", step="minute", stepmode="backward"),
+#                 dict(count=45, label="45m", step="minute", stepmode="backward"),
+#                 dict(count=1, label="HTD", step="hour", stepmode="todate"),
+#                 dict(count=3, label="3h", step="hour", stepmode="backward"),
+#                 dict(step="all")
+#             ])
+#         )
+#     )
+#     fig.update_layout(paper_bgcolor="#14151b", plot_bgcolor="#14151b", font_color="white")
+#     plot_div = plot(fig, auto_open=False, output_type='div')
+
+#     # ========================================== Machine Learning ==========================================
+
+#     try:
+#         df_ml = yf.download(tickers=ticker_value, period='3mo', interval='1h')
+#         print("Columns in the DataFrame:")
+#         print(df_ml.columns)
+#     except:
+#         ticker_value = 'AAPL'
+#         df_ml = yf.download(tickers=ticker_value, period='3mo', interval='1m')
+
+#     df_ml = df_ml[['Adj Close']].copy()
+
+#     # Preprocess the data for DBN
+#     df_ml['Returns'] = df_ml['Adj Close'].pct_change()
+
+#     # Reduce the number of states for discretization to 3
+#     df_ml.loc[:, 'Discrete_Returns'] = pd.qcut(df_ml['Returns'], 3, labels=False)
+
+#     # Reduce the number of lags to 5 or a manageable number
+#     number_of_days = min(number_of_days, 5)
+#     for lag in range(1, number_of_days + 1):
+#         df_ml.loc[:, f'Lag_{lag}'] = df_ml['Discrete_Returns'].shift(lag)
+
+#     df_ml.dropna(inplace=True)
+#     features = [f'Lag_{lag}' for lag in range(1, number_of_days + 1)]
+
+#     X = df_ml[features].values
+#     y = df_ml['Discrete_Returns'].values
+
+#     # Train-test split
+#     X_train, X_test, y_train, y_test = model_selection.train_test_split(X, y, test_size=0.2)
+
+#     # Define the structure of the Bayesian Network
+#     model = BayesianNetwork([(features[i], 'Discrete_Returns') for i in range(number_of_days)])
+#     model.fit(pd.DataFrame(np.column_stack((X_train, y_train)), columns=features + ['Discrete_Returns']), estimator=MaximumLikelihoodEstimator)
+
+#     # Predict
+#     X_test_df = pd.DataFrame(X_test, columns=features)
+#     y_pred = model.predict(X_test_df)['Discrete_Returns'].values
+
+#     forecast = y_pred.tolist()
+
+#     # ========================================== Plotting predicted data ======================================
+
+#     pred_dict = {"Date": [], "Prediction": []}
+#     for i in range(0, len(forecast)):
+#         pred_dict["Date"].append(dt.datetime.today() + dt.timedelta(days=i))
+#         pred_dict["Prediction"].append(forecast[i])
+
+#     pred_df = pd.DataFrame(pred_dict)
+#     pred_fig = go.Figure([go.Scatter(x=pred_df['Date'], y=pred_df['Prediction'])])
+#     pred_fig.update_xaxes(rangeslider_visible=True)
+#     pred_fig.update_layout(paper_bgcolor="#14151b", plot_bgcolor="#14151b", font_color="white")
+#     plot_div_pred = plot(pred_fig, auto_open=False, output_type='div')
+
+#     # ========================================== Display Ticker Info ==========================================
+
+#     ticker = pd.read_csv('app/Data/Tickers.csv')
+#     to_search = ticker_value
+#     ticker.columns = ['Symbol', 'Name', 'Last_Sale', 'Net_Change', 'Percent_Change', 'Market_Cap',
+#                       'Country', 'IPO_Year', 'Volume', 'Sector', 'Industry']
+#     for i in range(0, ticker.shape[0]):
+#         if ticker.Symbol[i] == to_search:
+#             Symbol = ticker.Symbol[i]
+#             Name = ticker.Name[i]
+#             Last_Sale = ticker.Last_Sale[i]
+#             Net_Change = ticker.Net_Change[i]
+#             Percent_Change = ticker.Percent_Change[i]
+#             Market_Cap = ticker.Market_Cap[i]
+#             Country = ticker.Country[i]
+#             IPO_Year = ticker.IPO_Year[i]
+#             Volume = ticker.Volume[i]
+#             Sector = ticker.Sector[i]
+#             Industry = ticker.Industry[i]
+#             break
+
+#     # ========================================== Page Render section ==========================================
+#     print('number of days', number_of_days)
+
+#     return render(request, "result.html", context={'plot_div': plot_div,
+#                                                    'confidence': None,  # Bayesian networks do not provide a direct confidence score like Linear Regression
+#                                                    'forecast': forecast,
+#                                                    'ticker_value': ticker_value,
+#                                                    'number_of_days': number_of_days,
+#                                                    'plot_div_pred': plot_div_pred,
+#                                                    'Symbol': Symbol,
+#                                                    'Name': Name,
+#                                                    'Last_Sale': Last_Sale,
+#                                                    'Net_Change': Net_Change,
+#                                                    'Percent_Change': Percent_Change,
+#                                                    'Market_Cap': Market_Cap,
+#                                                    'Country': Country,
+#                                                    'IPO_Year': IPO_Year,
+#                                                    'Volume': Volume,
+#                                                    'Sector': Sector,
+#                                                    'Industry': Industry,
+#                                                    })
+
+
+
 def predict_with_dbn(request, ticker_value, number_of_days):
     try:
         ticker_value = ticker_value.upper()
@@ -462,7 +609,6 @@ def predict_with_dbn(request, ticker_value, number_of_days):
     plot_div = plot(fig, auto_open=False, output_type='div')
 
     # ========================================== Machine Learning ==========================================
-
     try:
         df_ml = yf.download(tickers=ticker_value, period='3mo', interval='1h')
         print("Columns in the DataFrame:")
@@ -479,13 +625,11 @@ def predict_with_dbn(request, ticker_value, number_of_days):
     # Reduce the number of states for discretization to 3
     df_ml.loc[:, 'Discrete_Returns'] = pd.qcut(df_ml['Returns'], 3, labels=False)
 
-    # Reduce the number of lags to 5 or a manageable number
-    number_of_days = min(number_of_days, 5)
-    for lag in range(1, number_of_days + 1):
-        df_ml.loc[:, f'Lag_{lag}'] = df_ml['Discrete_Returns'].shift(lag)
+    # Reduce the number of lags to the specified number of days
+    df_ml['Discrete_Returns_Lagged'] = df_ml['Discrete_Returns'].shift(-number_of_days)
 
     df_ml.dropna(inplace=True)
-    features = [f'Lag_{lag}' for lag in range(1, number_of_days + 1)]
+    features = ['Discrete_Returns_Lagged']
 
     X = df_ml[features].values
     y = df_ml['Discrete_Returns'].values
@@ -494,7 +638,7 @@ def predict_with_dbn(request, ticker_value, number_of_days):
     X_train, X_test, y_train, y_test = model_selection.train_test_split(X, y, test_size=0.2)
 
     # Define the structure of the Bayesian Network
-    model = BayesianNetwork([(features[i], 'Discrete_Returns') for i in range(number_of_days)])
+    model = BayesianNetwork([('Discrete_Returns_Lagged', 'Discrete_Returns')])
     model.fit(pd.DataFrame(np.column_stack((X_train, y_train)), columns=features + ['Discrete_Returns']), estimator=MaximumLikelihoodEstimator)
 
     # Predict
@@ -504,7 +648,6 @@ def predict_with_dbn(request, ticker_value, number_of_days):
     forecast = y_pred.tolist()
 
     # ========================================== Plotting predicted data ======================================
-
     pred_dict = {"Date": [], "Prediction": []}
     for i in range(0, len(forecast)):
         pred_dict["Date"].append(dt.datetime.today() + dt.timedelta(days=i))
@@ -517,7 +660,6 @@ def predict_with_dbn(request, ticker_value, number_of_days):
     plot_div_pred = plot(pred_fig, auto_open=False, output_type='div')
 
     # ========================================== Display Ticker Info ==========================================
-
     ticker = pd.read_csv('app/Data/Tickers.csv')
     to_search = ticker_value
     ticker.columns = ['Symbol', 'Name', 'Last_Sale', 'Net_Change', 'Percent_Change', 'Market_Cap',
@@ -538,7 +680,6 @@ def predict_with_dbn(request, ticker_value, number_of_days):
             break
 
     # ========================================== Page Render section ==========================================
-    print('number of days', number_of_days)
 
     return render(request, "result.html", context={'plot_div': plot_div,
                                                    'confidence': None,  # Bayesian networks do not provide a direct confidence score like Linear Regression
